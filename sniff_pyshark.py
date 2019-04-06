@@ -33,7 +33,8 @@ class myThread(threading.Thread):
     def run(self):
          self.lockMe.acquire()
          for key,val in self.counts.items():
-                     print("{0}:{1}\t-->\t{2}:{3}\t{4} packets".format(key.src, key.src_port, key.dst, key.dst_port, val).replace(self.ip,bcolors["BLUE"]+"My_Computer"+bcolors["ENDC"]))
+                    # Only prints ip and occurences
+                     print("{0}\t\t-->\t\t{2}\t\t{4} packets".format(key.src, key.src_port, key.dst, key.dst_port, val).replace(self.ip,bcolors["BLUE"]+"My_Computer"+bcolors["ENDC"]))
          time.sleep(2)
          os.system('clear')
          self.lockMe.release()
@@ -52,13 +53,14 @@ class tcpPacket:
     def __repr__(self):
         return "{0},{1},{2},{3}".format(self.src, self.src_port, self.dst, self.dst_port)
 
+#Ignores same connection with different port number. Therefore will print the first occurence portnummer and counts alle further packages even if the portnumber changes
     def __eq__(self, other):
         if not isinstance(other, tcpPacket):
             return NotImplemented
-        return self.src == other.src and self.src_port == other.src_port and self.dst == other.dst and self.dst_port == other.dst_port and self.src_hostname == other.src_hostname and self.dst_hostname == other.dst_hostname
+        return self.src == other.src and self.dst == other.dst 
 
     def __hash__(self):
-        return hash((self.src, self.src_port, self.dst, self.dst_port, self.src_hostname, self.dst_hostname))
+        return hash((self.src, self.dst))
 
 def list_interfaces():
     proc = os.popen("tshark -D")
@@ -82,7 +84,10 @@ def get_ip_from_interface(interface):
 
 def dump_packets(capture, nic):
     i = 1
+    log = 1
     counts = {}
+    src_hostname = ""
+    dst_hostname = ""
     for packet in capture.sniff_continuously():
         if packet.transport_layer == 'TCP':
 
@@ -93,8 +98,11 @@ def dump_packets(capture, nic):
             elif ip_version == 6:
                 ip = packet.ipv6
             global tcp
-            src_hostname = socket.gethostbyaddr(ip.src)[0]
-            dst_hostname = socket.gethostbyaddr(ip.dst)[0]
+            try:
+                src_hostname = socket.gethostbyaddr(ip.src)[0]
+                dst_hostname = socket.gethostbyaddr(ip.dst)[0]
+            except Exception as error:
+               log += 1 
             tcp = tcpPacket(ip.src, packet.tcp.srcport, ip.dst, packet.tcp.dstport, src_hostname, dst_hostname)
             if tcp not in counts:
                 counts[tcp] = 1
@@ -124,7 +132,6 @@ def main(nic, file, list):
         capture = pyshark.FileCapture(file)
     elif file == None:
         capture = pyshark.LiveCapture(interface=nic)
-
     dump_packets(capture, nic)
 if __name__ == '__main__':
      main()
