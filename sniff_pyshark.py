@@ -5,12 +5,10 @@ import os
 import sys
 import click
 import pyshark
-import time
 import threading
 import netifaces as ni
-import re
 import socket
-
+from texttable import Texttable
 
 bcolors = {"BLUE": '\033[94m',
            "HIGH": '\033[93m',
@@ -35,7 +33,7 @@ class myThread(threading.Thread):
          for key,val in self.counts.items():
                     # Only prints ip and occurences
                      print("{0}\t\t-->\t\t{2}\t\t{4} packets".format(key.src, key.src_port, key.dst, key.dst_port, val).replace(self.ip,bcolors["BLUE"]+"My_Computer"+bcolors["ENDC"]))
-         time.sleep(2)
+         input("Press enter to update connections")
          os.system('clear')
          self.lockMe.release()
 
@@ -80,12 +78,12 @@ def get_ip_version(packet):
 def get_ip_from_interface(interface):
         return ni.ifaddresses(interface)[ni.AF_INET][0]['addr']
 
-
+counts = {}
 
 def dump_packets(capture, nic):
     i = 1
     log = 1
-    counts = {}
+    #counts = {}
     src_hostname = ""
     dst_hostname = ""
     for packet in capture.sniff_continuously():
@@ -113,6 +111,15 @@ def dump_packets(capture, nic):
         i += 1
     thread.join()
 
+def showDomains():
+    print("\n")
+    t = Texttable()
+    t.add_row(['Source','DN','Port','Destination','DN','Port','packets'])
+    for key, value in counts.items():
+        t.add_row([key.src, key.src_hostname,key.src_port, key.dst, key.dst_hostname, key.dst_port, value])
+    print(t.draw())
+
+
 
 
 @click.command()
@@ -132,6 +139,10 @@ def main(nic, file, list):
         capture = pyshark.FileCapture(file)
     elif file == None:
         capture = pyshark.LiveCapture(interface=nic)
-    dump_packets(capture, nic)
+    try:
+        dump_packets(capture, nic)
+    except KeyboardInterrupt:
+        showDomains()
+        sys.exit(0)
 if __name__ == '__main__':
      main()
